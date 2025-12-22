@@ -1,48 +1,32 @@
-package org.quoridor.agent;
+package ai_project.agent;
 
-import org.quoridor.evalutionFunction.EvaluationFunction;
-import org.quoridor.evalutionFunction.PathLengthEvaluation;
-import org.quoridor.searchStrategy.MinimaxSearch;
-import org.quoridor.searchStrategy.SearchStrategy;
-import org.quoridor.board.Board;
-import org.quoridor.board.model.Move;
-
-import java.util.*;
+import ai_project.board.Board;
+import ai_project.board.model.Move;
+import ai_project.eval.EvaluationFunction;
+import ai_project.eval.PathLengthEvaluation;
+import ai_project.search.MinimaxSearch;
+import ai_project.search.SearchStrategy;
+import java.util.List;
+import java.util.Random;
 
 public final class AIBot {
     private final int playerId;
-    private String difficulty;
     private int depth;
     private final SearchStrategy search;
     private final EvaluationFunction eval;
     private final Random rng = new Random();
-
-    public AIBot(int playerId) {
-        this(playerId, "medium", new MinimaxSearch(), new PathLengthEvaluation());
-    }
+    private final String difficulty;
 
     public AIBot(int playerId, String difficulty) {
-        this(playerId, difficulty, new MinimaxSearch(), new PathLengthEvaluation());
-    }
-
-    public AIBot(int playerId, String difficulty,
-                 SearchStrategy search,
-                 EvaluationFunction eval) {
-        if (playerId != 1 && playerId != 2) {
-            throw new IllegalArgumentException("playerId must be 1 or 2");
-        }
         this.playerId = playerId;
-        this.search = search;
-        this.eval = eval;
-        setDifficulty(difficulty);
-    }
-
-    public void setDifficulty(String difficulty) {
+        this.search = new MinimaxSearch();
+        this.eval = new PathLengthEvaluation();
         this.difficulty = difficulty.toLowerCase();
+        
         this.depth = switch (this.difficulty) {
-            case "easy"   -> 1;
-            case "medium" -> 2;
-            case "hard"   -> 3;
+            case "easy"   -> 1; // Random/Greedy
+            case "medium" -> 2; // Basic Strategy
+            case "hard"   -> 3; // Deep Strategy (Looks 3 moves ahead)
             default       -> 2;
         };
     }
@@ -51,7 +35,8 @@ public final class AIBot {
         List<Move> legal = board.getLegalMoves(playerId);
         if (legal.isEmpty()) return null;
 
-        if ("easy".equals(difficulty)) {
+        // Easy Mode: 30% chance to make a random bad move
+        if ("easy".equals(difficulty) && rng.nextDouble() < 0.3) {
             return legal.get(rng.nextInt(legal.size()));
         }
 
