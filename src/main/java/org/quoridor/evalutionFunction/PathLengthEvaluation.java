@@ -3,10 +3,11 @@ package org.quoridor.evalutionFunction;
 
 import org.quoridor.board.Board;
 import org.quoridor.board.QuoridorBoard;
-import ai_project.board.model.Move;
-import ai_project.board.model.MoveKind;
-import ai_project.board.model.Pos;
-import ai_project.board.model.WallOrientation;
+import org.quoridor.board.model.Move;
+import org.quoridor.board.model.MoveKind;
+import org.quoridor.board.model.Pos;
+import org.quoridor.board.model.WallOrientation;
+
 
 import java.util.List;
 
