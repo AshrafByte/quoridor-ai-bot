@@ -7,6 +7,9 @@ import org.quoridor.searchStrategy.SearchStrategy;
 import org.quoridor.board.Board;
 import org.quoridor.board.model.Move;
 
+import java.util.List;
+import java.util.Random;
+
 public final class AIBot {
     private final int playerId;
     private int depth;
