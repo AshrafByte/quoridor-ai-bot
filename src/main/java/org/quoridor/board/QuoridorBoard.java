@@ -1,303 +1,211 @@
 
 package org.quoridor.board;
 
-import org.quoridor.board.model.Move;
-import org.quoridor.board.model.MoveKind;
-import org.quoridor.board.model.Pos;
-import org.quoridor.board.model.WallOrientation;
-
+import ai_project.board.model.Move;
+import ai_project.board.model.MoveKind;
+import ai_project.board.model.Pos;
+import ai_project.board.model.WallOrientation;
 import java.util.*;
-
-/**
- * 2-player Quoridor board implementing Board.
- * 9x9 grid, players start at (0,4) and (8,4).
- */
 
 public final class QuoridorBoard implements Board {
 
     public static final int SIZE = 9;
+    public static final int MAX_WALLS = 10; // 10 walls per player
 
-    private final Pos p1Pos;
-    private final Pos p2Pos;
-    private final int p1Walls;
-    private final int p2Walls;
-    private final Set<Pos> wallsH; // horizontal walls at (row,col)
-    private final Set<Pos> wallsV; // vertical walls at (row,col)
-    private final int toMove;      // 1 or 2
+    private final Pos p1Pos, p2Pos;
+    private final int p1Walls, p2Walls; // Represents "Walls Used" (0 -> 10)
+    private final Set<Pos> wallsH, wallsV;
+    private final int toMove;
 
     public QuoridorBoard() {
-        this(new Pos(0, 4), new Pos(8, 4), 10, 10, new HashSet<>(), new HashSet<>(), 1);
+        // P1 starts at (8,4) [Bottom], P2 at (0,4) [Top]
+        // Walls Used initialized to 0
+        this(new Pos(8, 4), new Pos(0, 4), 0, 0, new HashSet<>(), new HashSet<>(), 1);
     }
 
-    private QuoridorBoard(Pos p1Pos,
-                          Pos p2Pos,
-                          int p1Walls,
-                          int p2Walls,
-                          Set<Pos> wallsH,
-                          Set<Pos> wallsV,
-                          int toMove) {
-        this.p1Pos = p1Pos;
-        this.p2Pos = p2Pos;
-        this.p1Walls = p1Walls;
-        this.p2Walls = p2Walls;
-        this.wallsH = Collections.unmodifiableSet(wallsH);
-        this.wallsV = Collections.unmodifiableSet(wallsV);
-        this.toMove = toMove;
+    private QuoridorBoard(Pos p1, Pos p2, int w1, int w2, Set<Pos> wh, Set<Pos> wv, int tm) {
+        this.p1Pos = p1; this.p2Pos = p2; this.p1Walls = w1; this.p2Walls = w2;
+        this.wallsH = Collections.unmodifiableSet(wh);
+        this.wallsV = Collections.unmodifiableSet(wv);
+        this.toMove = tm;
     }
 
-    private QuoridorBoard copyWith(Pos p1Pos,
-                                   Pos p2Pos,
-                                   int p1Walls,
-                                   int p2Walls,
-                                   Set<Pos> wallsH,
-                                   Set<Pos> wallsV,
-                                   int toMove) {
-        return new QuoridorBoard(p1Pos, p2Pos, p1Walls, p2Walls, wallsH, wallsV, toMove);
+    private QuoridorBoard copyWith(Pos p1, Pos p2, int w1, int w2, Set<Pos> wh, Set<Pos> wv, int tm) {
+        return new QuoridorBoard(p1, p2, w1, w2, wh, wv, tm);
     }
 
-    private int otherPlayer(int pid)    { return pid == 1 ? 2 : 1; }
-    private Pos posOf(int pid)          { return pid == 1 ? p1Pos : p2Pos; }
-    private int goalRow(int pid)        { return pid == 1 ? 8 : 0; }
-    private int wallsLeft(int pid)      { return pid == 1 ? p1Walls : p2Walls; }
-
-    // ---------------- Board interface ----------------
+    private int otherPlayer(int pid) { return pid == 1 ? 2 : 1; }
+    private Pos posOf(int pid) { return pid == 1 ? p1Pos : p2Pos; }
+    private int goalRow(int pid) { return pid == 1 ? 0 : 8; }
+    
+    // Helper to get walls used by specific player ID
+    private int getWallsUsed(int pid) { return pid == 1 ? p1Walls : p2Walls; }
 
     @Override
-    public boolean isTerminal() {
-        return p1Pos.row() == 8 || p2Pos.row() == 0;
-    }
+    public boolean isTerminal() { return p1Pos.row() == 0 || p2Pos.row() == 8; }
 
     @Override
     public Integer getWinner() {
-        boolean p1Goal = p1Pos.row() == 8;
-        boolean p2Goal = p2Pos.row() == 0;
-        if (p1Goal && p2Goal) return null;
-        if (p1Goal) return 1;
-        if (p2Goal) return 2;
+        if (p1Pos.row() == 0) return 1;
+        if (p2Pos.row() == 8) return 2;
         return null;
     }
 
     @Override
     public List<Move> getLegalMoves(int playerId) {
         if (isTerminal()) return List.of();
-
         List<Move> moves = new ArrayList<>();
-
-        // Pawn moves
-        for (Pos t : legalPawnTargets(playerId)) {
-            moves.add(Move.pawn(t.row(), t.col()));
-        }
-
-        // Wall moves
-        if (wallsLeft(playerId) > 0) {
+        
+        // 1. Pawn Moves
+        for (Pos t : legalPawnTargets(playerId)) moves.add(Move.pawn(t.row(), t.col()));
+        
+        // 2. Wall Moves (Only if used < 10)
+        if (getWallsUsed(playerId) < MAX_WALLS) {
             for (int r = 0; r < 8; r++) {
                 for (int c = 0; c < 8; c++) {
                     Pos cell = new Pos(r, c);
-                    if (isWallPlacementValid(playerId, cell, WallOrientation.HORIZONTAL)) {
+                    if (isWallPlacementValid(playerId, cell, WallOrientation.HORIZONTAL))
                         moves.add(Move.wall(r, c, WallOrientation.HORIZONTAL));
-                    }
-                    if (isWallPlacementValid(playerId, cell, WallOrientation.VERTICAL)) {
+                    if (isWallPlacementValid(playerId, cell, WallOrientation.VERTICAL))
                         moves.add(Move.wall(r, c, WallOrientation.VERTICAL));
-                    }
                 }
             }
         }
-
         return moves;
     }
 
     @Override
     public Board applyMove(Move move) {
-        MoveKind kind = move.kind();
-        Pos target = new Pos(move.row(), move.col());
-
-        Pos newP1 = p1Pos;
-        Pos newP2 = p2Pos;
-        int newP1Walls = p1Walls;
-        int newP2Walls = p2Walls;
-        Set<Pos> newWallsH = new HashSet<>(wallsH);
-        Set<Pos> newWallsV = new HashSet<>(wallsV);
-        int nextToMove = otherPlayer(toMove);
-
-        if (kind == MoveKind.PAWN) {
-            if (toMove == 1) newP1 = target;
-            else newP2 = target;
-        } else if (kind == MoveKind.WALL) {
-            int pid = toMove;
-            WallOrientation o = move.orientation();
-            if (!isWallPlacementValid(pid, target, o)) {
-                throw new IllegalArgumentException("Illegal wall placement " + move);
-            }
-            if (pid == 1) newP1Walls--;
-            else newP2Walls--;
-
-            if (o == WallOrientation.HORIZONTAL) newWallsH.add(target);
-            else newWallsV.add(target);
+        Pos np1 = p1Pos, np2 = p2Pos;
+        int nw1 = p1Walls, nw2 = p2Walls;
+        Set<Pos> nwh = new HashSet<>(wallsH), nwv = new HashSet<>(wallsV);
+        
+        if (move.kind() == MoveKind.PAWN) {
+            if (toMove == 1) np1 = new Pos(move.row(), move.col());
+            else np2 = new Pos(move.row(), move.col());
         } else {
-            throw new IllegalStateException("Unknown move kind: " + kind);
+            // Validate
+            if (!isWallPlacementValid(toMove, new Pos(move.row(), move.col()), move.orientation()))
+                throw new IllegalArgumentException("Illegal wall move detected: " + move);
+                
+            // Increment Wall Count (Used)
+            if (toMove == 1) nw1++; else nw2++; 
+            
+            if (move.orientation() == WallOrientation.HORIZONTAL) nwh.add(new Pos(move.row(), move.col()));
+            else nwv.add(new Pos(move.row(), move.col()));
         }
-
-        return copyWith(newP1, newP2, newP1Walls, newP2Walls, newWallsH, newWallsV, nextToMove);
+        return copyWith(np1, np2, nw1, nw2, nwh, nwv, otherPlayer(toMove));
     }
 
     @Override
     public int shortestPathLength(int playerId) {
         Pos start = posOf(playerId);
         int goal = goalRow(playerId);
-
-        record Node(Pos pos, int dist) {}
-
-        Queue<Node> q = new ArrayDeque<>();
-        boolean[][] visited = new boolean[SIZE][SIZE];
-        q.add(new Node(start, 0));
-        visited[start.row()][start.col()] = true;
+        
+        // BFS
+        Queue<Pos> q = new ArrayDeque<>();
+        q.add(start);
+        int[][] dist = new int[SIZE][SIZE];
+        for(int[] row : dist) Arrays.fill(row, -1);
+        dist[start.row()][start.col()] = 0;
 
         while (!q.isEmpty()) {
-            Node cur = q.remove();
-            if (cur.pos().row() == goal) return cur.dist();
-
-            for (Pos nb : neighbors4(cur.pos())) {
-                if (visited[nb.row()][nb.col()]) continue;
-                if (isEdgeBlocked(cur.pos(), nb)) continue;
-                visited[nb.row()][nb.col()] = true;
-                q.add(new Node(nb, cur.dist() + 1));
+            Pos cur = q.remove();
+            if (cur.row() == goal) return dist[cur.row()][cur.col()];
+            
+            for (Pos nb : neighbors4(cur)) {
+                if (dist[nb.row()][nb.col()] == -1 && !isEdgeBlocked(cur, nb)) {
+                    dist[nb.row()][nb.col()] = dist[cur.row()][cur.col()] + 1;
+                    q.add(nb);
+                }
             }
         }
-
         return Integer.MAX_VALUE;
     }
 
-    @Override
-    public int getToMove() {
-        return toMove;
-    }
-    // ---------------- Pawn movement helpers ----------------
-
     private List<Pos> neighbors4(Pos p) {
-        int r = p.row(), c = p.col();
-        List<Pos> res = new ArrayList<>(4);
-        if (r > 0) res.add(new Pos(r - 1, c));
-        if (r < SIZE - 1) res.add(new Pos(r + 1, c));
-        if (c > 0) res.add(new Pos(r, c - 1));
-        if (c < SIZE - 1) res.add(new Pos(r, c + 1));
+        List<Pos> res = new ArrayList<>();
+        int[] dr = {-1, 1, 0, 0}, dc = {0, 0, -1, 1};
+        for (int i=0; i<4; i++) {
+            int nr = p.row()+dr[i], nc = p.col()+dc[i];
+            if (nr>=0 && nr<SIZE && nc>=0 && nc<SIZE) res.add(new Pos(nr, nc));
+        }
         return res;
     }
 
     private boolean isEdgeBlocked(Pos a, Pos b) {
-        int r1 = a.row(), c1 = a.col();
-        int r2 = b.row(), c2 = b.col();
-
-        if (Math.abs(r1 - r2) + Math.abs(c1 - c2) != 1) {
-            return true; // not orthogonally adjacent
+        if (a.col() == b.col()) { // Vertical move
+            int r = Math.min(a.row(), b.row());
+            if (wallsH.contains(new Pos(r, a.col()))) return true;
+            if (a.col() > 0 && wallsH.contains(new Pos(r, a.col()-1))) return true;
+        } else { // Horizontal move
+            int c = Math.min(a.col(), b.col());
+            if (wallsV.contains(new Pos(a.row(), c))) return true;
+            if (a.row() > 0 && wallsV.contains(new Pos(a.row()-1, c))) return true;
         }
-
-        // Vertical move
-        if (c1 == c2) {
-            int rMin = Math.min(r1, r2);
-            Pos h1 = new Pos(rMin, c1);
-            if (wallsH.contains(h1)) return true;
-            if (c1 > 0 && wallsH.contains(new Pos(rMin, c1 - 1))) return true;
-            return false;
-        }
-
-        // Horizontal move
-        int r = r1;
-        int cMin = Math.min(c1, c2);
-        Pos v1 = new Pos(r, cMin);
-        if (wallsV.contains(v1)) return true;
-        if (r > 0 && wallsV.contains(new Pos(r - 1, cMin))) return true;
         return false;
     }
-
+    
     private List<Pos> legalPawnTargets(int pid) {
-        Pos my = posOf(pid);
-        Pos opp = posOf(otherPlayer(pid));
-        Set<Pos> result = new LinkedHashSet<>();
-
-        int[][] dirs = { {-1,0}, {1,0}, {0,-1}, {0,1} };
-
-        for (int[] d : dirs) {
-            int nr = my.row() + d[0];
-            int nc = my.col() + d[1];
-            if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) continue;
-            Pos next = new Pos(nr, nc);
-            if (isEdgeBlocked(my, next)) continue;
-
-            if (!next.equals(opp)) {
-                result.add(next);
-            } else {
-                // opponent adjacent: jump or diagonal-around
-                int j2r = nr + d[0];
-                int j2c = nc + d[1];
-                Pos jumpTarget = new Pos(j2r, j2c);
-
-                if (j2r >= 0 && j2r < SIZE && j2c >= 0 && j2c < SIZE &&
-                        !isEdgeBlocked(next, jumpTarget)) {
-                    result.add(jumpTarget);
-                } else {
-                    if (d[0] != 0) { // vertical move: diagonals left/right
-                        int[] sideCols = { nc - 1, nc + 1 };
-                        for (int sc : sideCols) {
-                            if (sc < 0 || sc >= SIZE) continue;
-                            Pos diag = new Pos(nr, sc);
-                            if (!isEdgeBlocked(next, diag)) {
-                                result.add(diag);
-                            }
-                        }
-                    } else { // horizontal move: diagonals up/down
-                        int[] sideRows = { nr - 1, nr + 1 };
-                        for (int sr : sideRows) {
-                            if (sr < 0 || sr >= SIZE) continue;
-                            Pos diag = new Pos(sr, nc);
-                            if (!isEdgeBlocked(next, diag)) {
-                                result.add(diag);
-                            }
-                        }
+        List<Pos> res = new ArrayList<>();
+        Pos my = posOf(pid), opp = posOf(otherPlayer(pid));
+        
+        for (Pos n : neighbors4(my)) {
+            if (isEdgeBlocked(my, n)) continue;
+            
+            if (!n.equals(opp)) {
+                res.add(n);
+            } else { 
+                // Jump Logic
+                int dr = n.row() - my.row(), dc = n.col() - my.col();
+                Pos jump = new Pos(n.row()+dr, n.col()+dc);
+                
+                if (jump.row()>=0 && jump.row()<SIZE && jump.col()>=0 && jump.col()<SIZE && !isEdgeBlocked(n, jump)) {
+                    res.add(jump);
+                } else { 
+                    if (dr!=0) {
+                        if(n.col()>0 && !isEdgeBlocked(n, new Pos(n.row(), n.col()-1))) res.add(new Pos(n.row(), n.col()-1));
+                        if(n.col()<SIZE-1 && !isEdgeBlocked(n, new Pos(n.row(), n.col()+1))) res.add(new Pos(n.row(), n.col()+1));
+                    } else {
+                        if(n.row()>0 && !isEdgeBlocked(n, new Pos(n.row()-1, n.col()))) res.add(new Pos(n.row()-1, n.col()));
+                        if(n.row()<SIZE-1 && !isEdgeBlocked(n, new Pos(n.row()+1, n.col()))) res.add(new Pos(n.row()+1, n.col()));
                     }
                 }
             }
         }
-
-        return new ArrayList<>(result);
+        return res;
     }
-
-    // ---------------- Wall placement ----------------
 
     private boolean isWallPlacementValid(int pid, Pos cell, WallOrientation o) {
-        if (wallsLeft(pid) <= 0) return false;
-        int r = cell.row(), c = cell.col();
-        if (r < 0 || r > 7 || c < 0 || c > 7) return false;
+        // --- CHANGE: Check constraint (Must be less than 10 used) ---
+        if (getWallsUsed(pid) >= MAX_WALLS) return false;
 
+        // 1. Overlap & Crossing Checks
         if (o == WallOrientation.HORIZONTAL) {
-            if (wallsH.contains(cell)) return false;
-            if (wallsH.contains(new Pos(r, c - 1)) || wallsH.contains(new Pos(r, c + 1)))
-                return false;
-            if (wallsV.contains(cell)) return false; // crossing
+            if (wallsH.contains(cell) || wallsV.contains(cell)) return false;
+            if (wallsH.contains(new Pos(cell.row(), cell.col()-1))) return false;
+            if (wallsH.contains(new Pos(cell.row(), cell.col()+1))) return false;
         } else {
-            if (wallsV.contains(cell)) return false;
-            if (wallsV.contains(new Pos(r - 1, c)) || wallsV.contains(new Pos(r + 1, c)))
-                return false;
-            if (wallsH.contains(cell)) return false; // crossing
+            if (wallsV.contains(cell) || wallsH.contains(cell)) return false;
+            if (wallsV.contains(new Pos(cell.row()-1, cell.col()))) return false;
+            if (wallsV.contains(new Pos(cell.row()+1, cell.col()))) return false;
         }
-
-        // simulate placement and ensure both paths exist
-        Set<Pos> tmpH = new HashSet<>(wallsH);
-        Set<Pos> tmpV = new HashSet<>(wallsV);
-        if (o == WallOrientation.HORIZONTAL) tmpH.add(cell);
-        else tmpV.add(cell);
-
-        QuoridorBoard tmp = copyWith(p1Pos, p2Pos, p1Walls, p2Walls, tmpH, tmpV, toMove);
-        int d1 = tmp.shortestPathLength(1);
-        int d2 = tmp.shortestPathLength(2);
-        if (d1 == Integer.MAX_VALUE || d2 == Integer.MAX_VALUE) return false;
-
-        return true;
+        
+        // 2. Path Existence Check
+        Set<Pos> nh = new HashSet<>(wallsH), nv = new HashSet<>(wallsV);
+        if(o == WallOrientation.HORIZONTAL) nh.add(cell); else nv.add(cell);
+        
+        QuoridorBoard test = copyWith(p1Pos, p2Pos, p1Walls, p2Walls, nh, nv, toMove);
+        return test.shortestPathLength(1) != Integer.MAX_VALUE && test.shortestPathLength(2) != Integer.MAX_VALUE;
     }
 
-    // ---------------- Getters (useful for GUI/debug) ----------------
-
+    @Override public int getToMove() { return toMove; }
+    
+    // Getters
     public Pos getP1Pos() { return p1Pos; }
     public Pos getP2Pos() { return p2Pos; }
     public int getP1Walls() { return p1Walls; }
     public int getP2Walls() { return p2Walls; }
+    public Set<Pos> getWallsH() { return wallsH; }
+    public Set<Pos> getWallsV() { return wallsV; }
 }
