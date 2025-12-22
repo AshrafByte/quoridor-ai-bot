@@ -1,13 +1,11 @@
-package ai_project.agent;
+package org.quoridor.agent;
 
-import ai_project.board.Board;
-import ai_project.board.model.Move;
-import ai_project.eval.EvaluationFunction;
-import ai_project.eval.PathLengthEvaluation;
-import ai_project.search.MinimaxSearch;
-import ai_project.search.SearchStrategy;
-import java.util.List;
-import java.util.Random;
+import org.quoridor.evalutionFunction.EvaluationFunction;
+import org.quoridor.evalutionFunction.PathLengthEvaluation;
+import org.quoridor.searchStrategy.MinimaxSearch;
+import org.quoridor.searchStrategy.SearchStrategy;
+import org.quoridor.board.Board;
+import org.quoridor.board.model.Move;
 
 public final class AIBot {
     private final int playerId;
